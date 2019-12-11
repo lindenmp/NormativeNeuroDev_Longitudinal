@@ -36,10 +36,11 @@ parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels = set_p
 
 # ### Setup output directory
 
-# In[4]:
+# In[15]:
 
 
 print(os.environ['MODELDIR'])
+if not os.path.exists(os.environ['MODELDIR']): os.makedirs(os.environ['MODELDIR'])
 
 
 # ## Load train/test .csv and setup node .csv
