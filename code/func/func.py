@@ -7,6 +7,8 @@ import numpy as np
 import scipy as sp
 import pandas as pd
 
+from statsmodels.stats import multitest
+
 def get_cmap(which_type = 'qual1', num_classes = 8):
     # Returns a nice set of colors to make a nice colormap using the color schemes
     # from http://colorbrewer2.org/
@@ -86,3 +88,38 @@ def update_progress(progress, my_str = ''):
     clear_output(wait = True)
     text = my_str + " Progress: [{0}] {1:.1f}%".format( "#" * block + "-" * (bar_length - block), progress * 100)
     print(text)
+
+
+def get_synth_cov(df, cov = 'scanageYears', stp = 1):
+    # Synthetic cov data
+    X_range = [np.min(df[cov]), np.max(df[cov])]
+    X = np.arange(X_range[0],X_range[1],stp)
+    X = X.reshape(-1,1)
+
+    return X
+
+
+def run_corr(df_X, df_y, typ = 'spearmanr'):
+    df_corr = pd.DataFrame(index = df_y.columns, columns = ['coef', 'p'])
+    for i, row in df_corr.iterrows():
+        if typ == 'spearmanr':
+            df_corr.loc[i] = sp.stats.spearmanr(df_X, df_y[i])
+        elif typ == 'pearsonr':
+            df_corr.loc[i] = sp.stats.pearsonr(df_X, df_y[i])
+
+    return df_corr
+
+
+def get_fdr_p(p_vals):
+    out = multitest.multipletests(p_vals, alpha = 0.05, method = 'fdr_bh')
+    p_fdr = out[1] 
+
+    return p_fdr
+
+
+def get_fdr_p_df(p_vals):
+    p_fdr = pd.DataFrame(index = p_vals.index,
+                        columns = p_vals.columns,
+                        data = np.reshape(get_fdr_p(p_vals.values.flatten()), p_vals.shape))
+
+    return p_fdr
