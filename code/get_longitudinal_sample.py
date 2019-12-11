@@ -295,13 +295,6 @@ os.chdir(os.environ['FIGDIR'])
 sns.set(style='white', context = 'paper', font_scale = 1)
 cmap = get_cmap('pair')
 
-phenos = ('Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear')
-phenos_label_short = ('Ov. Psych.', 'Psy. (pos.)', 'Psy. (neg.)', 'Anx.-mis.', 'Ext.', 'Fear')
-phenos_label = ('Overall Psychopathology','Psychosis (Positive)','Psychosis (Negative)','Anxious-Misery','Externalizing','Fear')
-metrics = ('ct', 'str', 'ac', 'mc')
-metrics_label_short = ('Thickness', 'Strength', 'Ave. ctrb.', 'Mod. ctrb.')
-metrics_label = ('Thickness', 'Strength', 'Average controllability', 'Modal controllability')
-
 
 # ## Age
 
