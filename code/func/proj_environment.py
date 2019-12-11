@@ -7,7 +7,7 @@ import numpy as np
 
 def set_proj_env(dataset = 'PNC', exclude_str = 't1Exclude',
     parc_str = 'schaefer', parc_scale = 400, parc_variant = 'orig', edge_weight = 'streamlineCount',
-    primary_covariate = 'ageAtScan1_Years', extra_str = ''):
+    primary_covariate = 'scanageYears', extra_str = ''):
 
     # Project root directory
     projdir = '/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_Longitudinal'; os.environ['PROJDIR'] = projdir
@@ -87,3 +87,4 @@ def set_proj_env(dataset = 'PNC', exclude_str = 't1Exclude',
                     'LimbicA', 'LimbicB', 'ContA', 'ContB', 'ContC', 'DefaultA', 'DefaultB', 'DefaultC', 'TempPar')
 
     return parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels
+
