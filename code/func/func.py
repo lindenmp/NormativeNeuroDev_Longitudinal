@@ -5,6 +5,7 @@
 from IPython.display import clear_output
 import numpy as np
 import scipy as sp
+from scipy import stats
 import pandas as pd
 
 from statsmodels.stats import multitest
@@ -123,3 +124,45 @@ def get_fdr_p_df(p_vals):
                         data = np.reshape(get_fdr_p(p_vals.values.flatten()), p_vals.shape))
 
     return p_fdr
+
+
+def mark_outliers(x, thresh = 3, c = 1.4826):
+    my_med = np.median(x)
+    mad = np.median(abs(x - my_med))/c
+    cut_off = mad * thresh
+    upper = my_med + cut_off
+    lower = my_med - cut_off
+    outliers = np.logical_or(x > upper, x < lower)
+    
+    return outliers
+
+
+def perc_dev(Z, thr = 2.6, sign = 'abs'):
+    if sign == 'abs':
+        bol = np.abs(Z) > thr;
+    elif sign == 'pos':
+        bol = Z > thr;
+    elif sign == 'neg':
+        bol = Z < -thr;
+    
+    # count the number that have supra-threshold z-stats and store as percentage
+    Z_perc = np.sum(bol, axis = 1) / Z.shape[1] * 100
+    
+    return Z_perc
+
+
+def evd(Z, thr = 0.01, sign = 'abs'):
+    m = Z.shape
+    l = np.int(m[1] * thr) # assumes features are on dim 1, subjs on dim 0
+    
+    if sign == 'abs':
+        T = np.sort(np.abs(Z), axis = 1)[:,m[1] - l:m[1]]
+    elif sign == 'pos':
+        T = np.sort(Z, axis = 1)[:,m[1] - l:m[1]]
+    elif sign == 'neg':
+        T = np.sort(Z, axis = 1)[:,:l]
+
+    E = sp.stats.trim_mean(T, 0.1, axis = 1)
+    
+    return E
+
