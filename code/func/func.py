@@ -166,3 +166,27 @@ def evd(Z, thr = 0.01, sign = 'abs'):
     
     return E
 
+
+def summarise_network(df, roi_loc, network_idx, metrics = ('ct',), method = 'mean'):
+
+    df_out = pd.DataFrame()
+    for metric in metrics:
+        if metric == 'ct':
+            if method == 'median': df_tmp = df.filter(regex = metric).groupby(network_idx[roi_loc == 1], axis = 1).median()
+            if method == 'mean': df_tmp = df.filter(regex = metric).groupby(network_idx[roi_loc == 1], axis = 1).mean()
+            if method == 'max': df_tmp = df.filter(regex = metric).groupby(network_idx[roi_loc == 1], axis = 1).max()
+            
+            my_list = [metric + '_' + str(i) for i in np.unique(network_idx[roi_loc == 1]).astype(int)]
+            df_tmp.columns = my_list
+        else:
+            if method == 'median': df_tmp = df.filter(regex = metric).groupby(network_idx, axis = 1).median()
+            if method == 'mean': df_tmp = df.filter(regex = metric).groupby(network_idx, axis = 1).mean()
+            if method == 'max': df_tmp = df.filter(regex = metric).groupby(network_idx, axis = 1).max()
+            
+            my_list = [metric + '_' + str(i) for i in np.unique(network_idx).astype(int)]
+            df_tmp.columns = my_list
+
+        df_out = pd.concat((df_out, df_tmp), axis = 1)
+
+    return df_out
+
