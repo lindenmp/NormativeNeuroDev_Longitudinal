@@ -25,7 +25,7 @@ from sklearn.metrics import make_scorer, r2_score, mean_squared_error, mean_abso
 
 sys.path.append('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_Longitudinal/code/func/')
 from proj_environment import set_proj_env
-from func import mark_outliers, get_cmap, run_corr, get_fdr_p, perc_dev, evd
+from func import mark_outliers, get_cmap, run_corr, get_fdr_p, perc_dev, evd, summarise_network
 
 
 # In[3]:
@@ -361,4 +361,140 @@ sns.heatmap(R.astype(float), annot = True, center = 0, vmax = 1, vmin = -1)
 
 
 g = sns.pairplot(df_node_summary, kind = 'reg', diag_kind = 'kde', height = 2)
+
+
+# In[36]:
+
+
+df_z_sys = summarise_network(df_z.loc[:,region_filter], parcel_loc[region_filter], yeo_idx[region_filter], metrics = ('ct',), method = 'mean')
+
+
+# In[37]:
+
+
+R = pd.DataFrame(index = df_z_sys.columns, columns = df_z_sys.columns)
+
+for i_col in df_z_sys.columns:
+    for j_col in df_z_sys.columns:
+        R.loc[i_col,j_col] = sp.stats.pearsonr(df_z_sys[i_col],df_z_sys[j_col])[0]
+
+
+# In[38]:
+
+
+sns.heatmap(R.astype(float), annot = False, center = 0, vmax = 1, vmin = -1)
+
+
+# # Predictive model: regression
+
+# Here the goal is to use brain features (and demographics) from a given timepoint to predict each of our psychopathology phenotypes at a given timepoint.
+
+# In[39]:
+
+
+df.columns
+
+
+# In[40]:
+
+
+# First, we start by using T1 to predict T1
+X = df_z_sys.loc[idx_t1,:].copy()
+print(X.shape)
+
+pheno = phenos[0]; print(pheno)
+y = df.loc[idx_t1,pheno + '_n']
+
+np.all(X.index.get_level_values(0) == y.index.get_level_values(0))
+
+
+# In[41]:
+
+
+nan_filt = y.isna().values
+X = X[~nan_filt]; print(X.shape)
+y = y[~nan_filt]; print(y.shape)
+
+sc = StandardScaler()
+X_std = sc.fit_transform(X); print(X_std.shape)
+
+
+# In[42]:
+
+
+# How does the Ridge regression alpha param impact coefficients within training sample?
+n_alphas = 50
+alphas = np.logspace(-5, 5, n_alphas)
+# alphas = 10**np.linspace(10,-2,100)*0.5
+print(alphas[0],alphas[-1])
+coefs = []
+for a in alphas:
+    mdl = Ridge(alpha=a)
+    mdl.fit(X_std, y)
+    coefs.append(mdl.coef_)
+
+
+# In[43]:
+
+
+# inner_cv = KFold(n_splits=10, shuffle=True, random_state=0)
+# outer_cv = KFold(n_splits=10, shuffle=True, random_state=0)
+inner_cv = KFold(n_splits=5, shuffle=False)
+outer_cv = KFold(n_splits=5, shuffle=False)
+
+
+# In[44]:
+
+
+# scoring = {'r2': 'r2', 'mse': make_scorer(mean_squared_error), 'mae': make_scorer(mean_absolute_error)}
+scoring = {'r2': 'r2', 'mse': 'neg_mean_squared_error', 'mae': 'neg_mean_absolute_error'}
+
+
+# In[45]:
+
+
+alpha_candidates = dict(alpha = alphas)
+mdl = GridSearchCV(estimator=Ridge(), param_grid=alpha_candidates, cv=inner_cv, scoring = scoring, refit = 'r2')
+
+
+# In[46]:
+
+
+# Fit the cross validated grid search on the data 
+mdl.fit(X_std, y);
+
+
+# In[47]:
+
+
+sns.set(style='white', context = 'talk', font_scale = 0.8)
+f, ax = plt.subplots(2,2)
+f.set_figwidth(15)
+f.set_figheight(15)
+
+ax[0,0].set_title('Ridge coefficients as a function of the regularization')
+ax[0,0].plot(alphas, coefs)
+ax[0,0].axvline(mdl.best_estimator_.alpha, linestyle = ':', color = 'k')
+ax[0,0].set_xscale('log')
+ax[0,0].set_xlabel('alpha')
+ax[0,0].set_ylabel('weights')
+ax[0,0].legend(list(X.columns))
+
+ax[0,1].plot(alphas, mdl.cv_results_['mean_test_r2'])
+ax[0,1].axvline(mdl.best_estimator_.alpha, linestyle = ':', color = 'k')
+ax[0,1].set_xscale('log')
+ax[0,1].set_xlabel('alpha')
+ax[0,1].set_ylabel('r2')
+
+ax[1,0].plot(alphas, mdl.cv_results_['mean_test_mse'])
+ax[1,0].axvline(mdl.best_estimator_.alpha, linestyle = ':', color = 'k')
+ax[1,0].set_xscale('log')
+ax[1,0].set_xlabel('alpha')
+ax[1,0].set_ylabel('neg mse')
+
+ax[1,1].plot(alphas, mdl.cv_results_['mean_test_mae'])
+ax[1,1].axvline(mdl.best_estimator_.alpha, linestyle = ':', color = 'k')
+ax[1,1].set_xscale('log')
+ax[1,1].set_xlabel('alpha')
+ax[1,1].set_ylabel('neg mae')
 
