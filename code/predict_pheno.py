@@ -411,6 +411,23 @@ np.all(X.index.get_level_values(0) == y.index.get_level_values(0))
 # In[41]:
 
 
+# Add continous*continous interaction terms
+X_int = X.multiply(df.loc[idx_t1,'scanageMonths'], axis = 0)
+X_int_names = list(X.columns)
+X_int_names = [s + '_age' for s in X_int_names]
+X_int.columns = X_int_names
+
+
+# In[42]:
+
+
+# X = X_int.copy()
+# X = pd.concat((X,X_int), axis = 1)
+
+
+# In[43]:
+
+
 nan_filt = y.isna().values
 X = X[~nan_filt]; print(X.shape)
 y = y[~nan_filt]; print(y.shape)
@@ -419,7 +436,7 @@ sc = StandardScaler()
 X_std = sc.fit_transform(X); print(X_std.shape)
 
 
-# In[42]:
+# In[44]:
 
 
 # How does the Ridge regression alpha param impact coefficients within training sample?
@@ -434,7 +451,7 @@ for a in alphas:
     coefs.append(mdl.coef_)
 
 
-# In[43]:
+# In[45]:
 
 
 # inner_cv = KFold(n_splits=10, shuffle=True, random_state=0)
@@ -443,28 +460,28 @@ inner_cv = KFold(n_splits=5, shuffle=False)
 outer_cv = KFold(n_splits=5, shuffle=False)
 
 
-# In[44]:
+# In[46]:
 
 
 # scoring = {'r2': 'r2', 'mse': make_scorer(mean_squared_error), 'mae': make_scorer(mean_absolute_error)}
 scoring = {'r2': 'r2', 'mse': 'neg_mean_squared_error', 'mae': 'neg_mean_absolute_error'}
 
 
-# In[45]:
+# In[47]:
 
 
 alpha_candidates = dict(alpha = alphas)
 mdl = GridSearchCV(estimator=Ridge(), param_grid=alpha_candidates, cv=inner_cv, scoring = scoring, refit = 'r2')
 
 
-# In[46]:
+# In[48]:
 
 
 # Fit the cross validated grid search on the data 
 mdl.fit(X_std, y);
 
 
-# In[47]:
+# In[49]:
 
 
 sns.set(style='white', context = 'talk', font_scale = 0.8)
@@ -497,4 +514,10 @@ ax[1,1].axvline(mdl.best_estimator_.alpha, linestyle = ':', color = 'k')
 ax[1,1].set_xscale('log')
 ax[1,1].set_xlabel('alpha')
 ax[1,1].set_ylabel('neg mae')
+
+
+# In[ ]:
+
+
+
 
