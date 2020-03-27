@@ -6,16 +6,28 @@
 # In[1]:
 
 
-import os, sys
+# Essentials
+import os, sys, glob
 import pandas as pd
 import numpy as np
-import numpy.matlib
+import nibabel as nib
+
+# Stats
+import scipy as sp
+from scipy import stats
+import statsmodels.api as sm
+import pingouin as pg
+
+# Plotting
+import seaborn as sns
+import matplotlib.pyplot as plt
+plt.rcParams['svg.fonttype'] = 'none'
 
 
 # In[2]:
 
 
-sys.path.append('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_Longitudinal/code/func/')
+sys.path.append('/Users/lindenmp/Dropbox/Work/ResProjects/neurodev_long/code/func/')
 from proj_environment import set_proj_env
 from func import get_synth_cov
 
@@ -24,10 +36,7 @@ from func import get_synth_cov
 
 
 exclude_str = 't1Exclude'
-parc_str = 'schaefer'
-parc_scale = 400
-parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels = set_proj_env(exclude_str = exclude_str,
-                                                                            parc_str = parc_str, parc_scale = parc_scale)
+parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels = set_proj_env(exclude_str = exclude_str)
 
 
 # In[4]:
@@ -42,10 +51,10 @@ if not os.path.exists(os.environ['MODELDIR']): os.makedirs(os.environ['MODELDIR'
 # In[5]:
 
 
-df = pd.read_csv(os.path.join(os.environ['MODELDIR_BASE'], 'df_pheno.csv'))
+df = pd.read_csv(os.path.join(os.environ['MODELDIR'], 'df_pheno.csv'))
 df.set_index(['bblid', 'scanid', 'timepoint'], inplace = True)
 
-df_node = pd.read_csv(os.path.join(os.environ['MODELDIR_BASE'], 'df_node_clean.csv'))
+df_node = pd.read_csv(os.path.join(os.environ['MODELDIR'], 'df_node_base.csv'))
 df_node.set_index(['bblid', 'scanid', 'timepoint'], inplace = True)
 
 # adjust sex to 0 and 1
@@ -92,21 +101,25 @@ if not os.path.exists(normativedir): os.mkdir(normativedir)
 # In[9]:
 
 
-# Write out training -- retaining only residuals from nuissance regression
-df[~df['train_test']].to_csv(os.path.join(normativedir, 'train.csv'))
-df[~df['train_test']].to_csv(os.path.join(normativedir, 'cov_train.txt'), columns = covs, sep = ' ', index = False, header = False)
+# Write out training
+df.loc[~df['train_test'],:].to_csv(os.path.join(normativedir, 'train.csv'))
+df.loc[~df['train_test'],:].to_csv(os.path.join(normativedir, 'cov_train.txt'), columns = covs, sep = ' ', index = False, header = False)
 
-resp_train = df_node[~df['train_test']]
+# Write out test
+df.loc[df['train_test'],:].to_csv(os.path.join(normativedir, 'test.csv'))
+df.loc[df['train_test'],:].to_csv(os.path.join(normativedir, 'cov_test.txt'), columns = covs, sep = ' ', index = False, header = False)
+
+
+# In[10]:
+
+
+resp_train = df_node.loc[~df['train_test'],:]
 mask = np.all(np.isnan(resp_train), axis = 1)
 if np.any(mask): print("Warning: NaNs in response train")
 resp_train.to_csv(os.path.join(normativedir, 'resp_train.csv'))
 resp_train.to_csv(os.path.join(normativedir, 'resp_train.txt'), sep = ' ', index = False, header = False)
 
-# Write out test -- retaining only residuals from nuissance regression
-df[df['train_test']].to_csv(os.path.join(normativedir, 'test.csv'))
-df[df['train_test']].to_csv(os.path.join(normativedir, 'cov_test.txt'), columns = covs, sep = ' ', index = False, header = False)
-
-resp_test = df_node[df['train_test']]
+resp_test = df_node.loc[df['train_test'],:]
 mask = np.all(np.isnan(resp_test), axis = 1)
 if np.any(mask): print("Warning: NaNs in response train")
 resp_test.to_csv(os.path.join(normativedir, 'resp_test.csv'))
@@ -119,7 +132,7 @@ print(str(resp_train.shape[1]) + ' features written out for normative modeling')
 
 # Used only to examine the predictions made by the trained normative model
 
-# In[10]:
+# In[11]:
 
 
 # Create subdirectory for specific normative model -- labeled according to parcellation/resolution choices and covariates
