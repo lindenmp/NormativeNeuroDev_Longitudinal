@@ -13,6 +13,13 @@ Longitudinal normative modelling project on PNC data
 	# Statistics
 	pip install scipy statsmodels sklearn pingouin
 
+	# Pysurfer for plotting
+	pip install mayavi
+	pip install PyQt5
+	jupyter nbextension install --py mayavi --user
+	jupyter nbextension enable --py mayavi --user
+	pip install pysurfer
+
     cd /Users/lindenmp/Dropbox/Work/ResProjects/neurodev_long
     conda env export > environment.yml
 	pip freeze > requirements.txt
