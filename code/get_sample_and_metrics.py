@@ -36,7 +36,7 @@ from func import get_cmap
 
 
 exclude_str = 't1Exclude'
-_ = set_proj_env(exclude_str = exclude_str)
+parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels = set_proj_env(exclude_str = exclude_str)
 
 
 # ### Setup output directory
@@ -44,8 +44,8 @@ _ = set_proj_env(exclude_str = exclude_str)
 # In[4]:
 
 
-print(os.environ['BASEDIR'])
-if not os.path.exists(os.environ['BASEDIR']): os.makedirs(os.environ['BASEDIR'])
+print(os.environ['MODELDIR'])
+if not os.path.exists(os.environ['MODELDIR']): os.makedirs(os.environ['MODELDIR'])
 
 
 # # Load in metadata
@@ -120,37 +120,70 @@ df = df[df['t1PostProcessExclude'] == 0]
 print('N after T1 exclusion:', df.shape[0])
 
 
-# ### Missing imaging data
-
-# Check if every participant actually has a cortical thickness data file. If not, exclude.
-
-# ### Thickness
+# ## Load in data
 
 # In[10]:
 
 
+metrics = ('ct', 'vol')
+
+
+# In[11]:
+
+
+# output dataframe
+ct_labels = ['ct_' + str(i) for i in range(num_parcels)]
+vol_labels = ['vol_' + str(i) for i in range(num_parcels)]
+
+df_node = pd.DataFrame(index = df.index, columns = ct_labels + vol_labels)
+
+print(df_node.shape)
+
+
+# ### Thickness
+
+# In[12]:
+
+
 # subject filter
 subj_filt = np.zeros((df.shape[0],)).astype(bool)
+
+
+# In[13]:
+
+
+CT = np.zeros((df.shape[0], num_parcels))
 
 for (i, (index, row)) in enumerate(df.iterrows()):
     file_name = os.environ['CT_NAME_TMP'].replace("bblid", str(index[0]))
     file_name = file_name.replace("scanid", str(index[1]))
     full_path = glob.glob(os.path.join(os.environ['CTDIR'], file_name))
     if i == 0: print(full_path)
-    if len(full_path) == 0:
+        
+    if len(full_path) > 0:
+        ct = np.loadtxt(full_path[0])
+        CT[i,:] = ct
+    elif len(full_path) == 0:
         subj_filt[i] = True
+    
+df_node.loc[:,ct_labels] = CT
 
-subj_filt.sum()
+
+# In[14]:
 
 
-# In[11]:
+np.sum(subj_filt)
+
+
+# In[15]:
 
 
 if any(subj_filt):
     df = df.loc[~subj_filt]
+    df_node = df_node.loc[~subj_filt]
 
 
-# In[12]:
+# In[16]:
 
 
 print('N after excluding missing subjects:', df.shape[0])
@@ -158,31 +191,55 @@ print('N after excluding missing subjects:', df.shape[0])
 
 # ### Volume
 
-# In[13]:
+# In[17]:
 
 
 # subject filter
 subj_filt = np.zeros((df.shape[0],)).astype(bool)
 
+
+# In[18]:
+
+
+VOL = np.zeros((df.shape[0], num_parcels))
+
 for (i, (index, row)) in enumerate(df.iterrows()):
     file_name = os.environ['VOL_NAME_TMP'].replace("bblid", str(index[0]))
     file_name = file_name.replace("scanid", str(index[1]))
     full_path = glob.glob(os.path.join(os.environ['VOLDIR'], file_name))
-    if i == 0: print(full_path)
-    if len(full_path) == 0:
+    if i == 0: print(full_path)    
+    
+    if len(full_path) > 0:
+        img = nib.load(full_path[0])
+        v = np.array(img.dataobj)
+        v = v[v != 0]
+        unique_elements, counts_elements = np.unique(v, return_counts=True)
+        if len(unique_elements) == num_parcels:
+            VOL[i,:] = counts_elements
+        else:
+            print(str(index) + '. Warning: not all parcels present')
+            subj_filt[i] = True
+    elif len(full_path) == 0:
         subj_filt[i] = True
+    
+df_node.loc[:,vol_labels] = VOL
 
-subj_filt.sum()
+
+# In[19]:
 
 
-# In[14]:
+np.sum(subj_filt)
+
+
+# In[20]:
 
 
 if any(subj_filt):
     df = df.loc[~subj_filt]
+    df_node = df_node.loc[~subj_filt]
 
 
-# In[15]:
+# In[21]:
 
 
 print('N after excluding missing subjects:', df.shape[0])
@@ -194,7 +251,7 @@ print('N after excluding missing subjects:', df.shape[0])
 # 
 # Also, I retain those participants who have only single timepoints of data even if those timepoints aren't T1.
 
-# In[16]:
+# In[22]:
 
 
 keep_me = ([1],[2],[3],[1,2],[1,2,3])
@@ -208,13 +265,14 @@ for idx, data in df.groupby('bblid'):
         idx_drop.append(idx)
 
 
-# In[17]:
+# In[23]:
 
 
 df = df.loc[idx_keep,:]
+df_node = df_node.loc[idx_keep,:]
 
 
-# In[18]:
+# In[24]:
 
 
 print('N after exclusion non-continuous scans:', df.shape[0])
@@ -226,7 +284,7 @@ print('N after exclusion non-continuous scans:', df.shape[0])
 # 
 # I create a new variable that counts the number of timpeoints each participant has after my filtering.
 
-# In[19]:
+# In[25]:
 
 
 for idx, data in df.groupby('bblid'):
@@ -234,7 +292,7 @@ for idx, data in df.groupby('bblid'):
 df.loc[:,'TotalNtimepoints_new'] = df.loc[:,'TotalNtimepoints_new'].astype(int)
 
 
-# In[20]:
+# In[26]:
 
 
 print('N w/ 1 timepoint:', df.loc[df['TotalNtimepoints_new'] == 1,:].shape[0])
@@ -246,7 +304,7 @@ print('N w/ 3 timepoints:', int(df.loc[df['TotalNtimepoints_new'] == 3,:].shape[
 
 # Note, this will fill missing phenotype data with NaNs. I prioritise retaining the full imaging sample for now.
 
-# In[21]:
+# In[27]:
 
 
 df.reset_index(inplace = True)
@@ -255,27 +313,27 @@ goassess.reset_index(inplace = True)
 goassess.set_index(['bblid', 'timepoint'], inplace = True)
 
 
-# In[22]:
+# In[28]:
 
 
 goassess.loc[:,'scanid'] = np.float('nan')
 
 
-# In[23]:
+# In[29]:
 
 
 for idx, data in df.iterrows():
     goassess.loc[idx,'scanid'] = data['scanid']
 
 
-# In[24]:
+# In[30]:
 
 
 df_out = pd.merge(df, goassess, on=['bblid', 'scanid', 'timepoint']).reset_index()
 df_out.set_index(['bblid', 'scanid', 'timepoint'], inplace = True)
 
 
-# In[25]:
+# In[31]:
 
 
 header = ['TotalNtimepoints', 'TotalNtimepoints_new', 'sex', 'race', 'ethnicity', 'scanageMonths', 'scanageYears', 'mprage_antsCT_vol_TBV', 'averageManualRating', 'dti32MeanRelRMS', 
@@ -285,13 +343,13 @@ df_out = df_out.loc[:,header]
 
 # Designate the individuals with only 1 timepoint as 'train' (False) and individuals with longitudinal data as 'test' (True)
 
-# In[26]:
+# In[32]:
 
 
 df_out.loc[:,'train_test'] = df_out.loc[:,'TotalNtimepoints_new'] != 1
 
 
-# In[27]:
+# In[33]:
 
 
 df_out.head()
@@ -299,15 +357,31 @@ df_out.head()
 
 # ### Final numbers
 
-# In[28]:
+# In[34]:
 
 
-print('N w/ 1 timepoint:', df.loc[df['TotalNtimepoints_new'] == 1,:].shape[0])
-print('N w/ >=2 timepoints:', int(df.loc[df['TotalNtimepoints_new'] == 2,:].shape[0]/2 + df.loc[df['TotalNtimepoints_new'] == 3,:].shape[0]/3))
-print('N w/ 3 timepoints:', int(df.loc[df['TotalNtimepoints_new'] == 3,:].shape[0]/3))
+print('N w/ 1 timepoint:', df_out.loc[df_out['TotalNtimepoints_new'] == 1,:].shape[0])
+print('N w/ >=2 timepoints:', int(df_out.loc[df_out['TotalNtimepoints_new'] == 2,:].shape[0]/2 + df_out.loc[df_out['TotalNtimepoints_new'] == 3,:].shape[0]/3))
+print('N w/ 3 timepoints:', int(df_out.loc[df_out['TotalNtimepoints_new'] == 3,:].shape[0]/3))
 
 
-# In[29]:
+# ### Export
+
+# In[35]:
+
+
+if np.all(df_out.index.get_level_values(0) == df_node.index.get_level_values(0)) and np.all(df_out.index.get_level_values(1) == df_node.index.get_level_values(1)):
+    df_node.index = df_out.index
+
+
+# In[36]:
+
+
+df_out.to_csv(os.path.join(os.environ['MODELDIR'], 'df_pheno.csv'))
+df_node.to_csv(os.path.join(os.environ['MODELDIR'], 'df_node_base.csv'))
+
+
+# In[37]:
 
 
 # find unique ages
@@ -331,7 +405,7 @@ elif test_diff.size != 0:
 
 # # Plots
 
-# In[30]:
+# In[38]:
 
 
 labels = ['Train', 'Test']
@@ -343,7 +417,7 @@ cmap = get_cmap('pair')
 
 # ## Age
 
-# In[31]:
+# In[39]:
 
 
 df_out.loc[:,'sex'].unique()
@@ -351,7 +425,7 @@ df_out.loc[:,'sex'].unique()
 
 # Predictably the test set has more data in the upper tail of the age distribution. This is because I define the test set based on individuals with multiple time points. This will limit the capacity for the normative model to generate deviations in the upper age range.
 
-# In[32]:
+# In[40]:
 
 
 f, axes = plt.subplots(1,2)
@@ -383,12 +457,4 @@ axes[1].set_xticks([r + barWidth for r in range(len(y_train))])
 axes[1].set_xticklabels(['Male', 'Female'])
 
 f.savefig('age_distributions.svg', dpi = 150, bbox_inches = 'tight', pad_inches = 0)
-
-
-# ## Export
-
-# In[33]:
-
-
-df_out.to_csv(os.path.join(os.environ['MODELDIR'], 'df_pheno.csv'))
 
